@@ -112,7 +112,41 @@ function sign(transaction, privateKey, toObject) {
   return toObject ? raw : `0x${rlp.encode(raw).toString('hex')}`;
 }
 
+
+/**
+ * Signs hash and returns signature string (or object)
+ *
+ * @method ecsign
+ * @param {Object} msg a hashed message
+ * @param {String} privateKey a valid 32 byte prefixed hex string private key
+ * @param {Boolean} toObject **Optional**
+ * @returns {String|Object} output either a serilized hex string or signed tx object
+ */
+
+function ecsign(msg, privateKey, toObject) {
+  if (typeof msg !== 'string' || msg === null) { throw new Error(`[ethjs-signer] transaction input must be a type 'string', got '${typeof(transaction)}'`); }
+  if (typeof privateKey !== 'string') { throw new Error('[ethjs-signer] private key input must be a string'); }
+  if (!privateKey.match(/^(0x)[0-9a-fA-F]{64}$/)) { throw new Error('[ethjs-signer] invalid private key value, private key must be a prefixed hexified 32 byte string (i.e. "0x..." 64 chars long).'); }
+  if (privateKey.substr(0, 2) !== '0x') { throw new Error('[ethjs-signer] private key must begin with a 0x prefix'); }
+
+  const raw = [];
+
+  // Remove hash 0x prefix if it exists
+  const msgFinal = msg.substr(0, 2) === '0x' ? msg.substr(2, msg.length - 2) : msg;
+
+  // private key is not stored in memory
+  const signature = secp256k1.keyFromPrivate(new Buffer(privateKey.slice(2), 'hex'))
+                   .sign((new Buffer(keccak256(rlp.encode(msgFinal)), 'hex')), { canonical: true });
+
+  raw.push(new Buffer([27 + signature.recoveryParam]));
+  raw.push(bnToBuffer(signature.r));
+  raw.push(bnToBuffer(signature.s));
+
+  return toObject ? { v: raw[0], r: raw[1], s: raw[2] } : `0x${rlp.encode(raw).toString('hex')}`;
+}
+
 module.exports = {
+  ecsign,
   sign,
   recover,
 };
